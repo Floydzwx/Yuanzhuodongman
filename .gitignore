@@ -1,0 +1,31 @@
+# ---- 不进 Git 的内容 ----
+
+# 原始封面（190MB；site/covers 里已是压缩后的 WebP）
+# 只忽略根目录的 covers/，不能写成covers/ —— 那会连site/covers 一起忽略掉
+/covers/
+
+# 本地数据与脚本（可重新生成，不进仓库）
+classified.json
+videos_full.json
+pay_status.json
+works_index.json
+seasons_full.json
+seasons_series.json
+cookies.txt
+
+# 浏览器自动化用的临时 profile
+edgeprofile*/
+edgeprof_*/
+
+# 临时文件
+_patch*.py
+_chk.py
+_c.js
+shot_*.png
+m_*.png
+site_check.png
+nohup.out
+
+# 旧页面（site/index.html 才是要部署的）
+covers_index.html
+fanju_index.html
