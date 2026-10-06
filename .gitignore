@@ -21,6 +21,7 @@ edgeprof_*/
 _patch*.py
 _chk.py
 _c.js
+push_retry.py
 shot_*.png
 m_*.png
 site_check.png
