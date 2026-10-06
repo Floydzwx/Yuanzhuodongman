@@ -1,0 +1,15 @@
+{
+  "name": "yuanshu-anime-archive",
+  "version": "1.0.0",
+  "description": "圆桌动漫番剧归档 - 自动抓取粉丝量与播放量并按作品汇总",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

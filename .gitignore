@@ -29,3 +29,19 @@ nohup.out
 # 旧页面（site/index.html 才是要部署的）
 covers_index.html
 fanju_index.html
+
+# 网站上传时散落在根目录的站点文件副本
+# （内容与 site/ 里的完全相同，已在 2026-10-06 合并远端时清理，
+#   保留 site/ 作为唯一部署目录，避免 Cloudflare 输出目录填错）
+/index.html
+/favicon.ico
+/README.txt
+/_headers
+/_redirects
+/robots.txt
+/up_avatar.jpg
+/me_avatar.jpg
+/_rootstrays_backup/
+
+# WorkBuddy 本地工作区数据
+/.workbuddy/

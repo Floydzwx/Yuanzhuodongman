@@ -1,0 +1,17 @@
+{
+  "name": "yuanshu-anime-archive",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+  "kv_namespaces": [
+    {
+      "binding": "STATS",
+      "id": "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 11 * * *"]
+  },
+  "observability": {
+    "enabled": true
+  }
+}
