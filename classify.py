@@ -463,11 +463,33 @@ for v in d:
 
 # 组内若某个「带集号」的条目时长远超其他分P（如【强欲魔女12】88min vs 其余 10min），
 # 说明它是独立长篇而非分P片段，应参与主视频竞争
+#
+# 但不能只看时长：连载中的某一集也可能超过 FANJU_MIN。
+# 《穿越到游戏王…》共P1~P14+番外篇，其中 P10 长1264s刚过20min门槛，
+# 于是被误捞成「汇总版」，实际它只是第 10 集（前后有 P9、P11 夹着）。
+#
+# 判据：只有「集号被别的集夹住」的长篇才留在 eps，
+# 即该条目前后都存在其它集号，说明它是连载中的一集而非全剧汇总。
+# 不能直接用 is_ep —— 「【第一季合集版】」「【完结合集】」这类汇总标记
+# 也会让 is_ep 为真，用它会把真汇总版误伤。
 for k, g in groups.items():
     if not g["eps"]: continue
     emax = max(e["dur"] for e in g["eps"])
     if emax < FANJU_MIN: continue
-    longs = [e for e in g["eps"] if e["dur"] >= FANJU_MIN]
+    # 收集本组所有集号（仅取带数字的），用于判断「被夹住」
+    all_epnos = set()
+    for v in g["mains"] + g["eps"]:
+        for (a, b) in (v.get("eps") or []):
+            if a: all_epnos.add(a)
+    def _clamped(v):
+        """该条目的集号前后是否都有其它集 -> 是连载中的一集"""
+        ns = [a for (a, _b) in (v.get("eps") or []) if a]
+        if not ns: return False          # 没有数字集号（可能是别名型分P）
+        for n in ns:
+            if (n - 1) in all_epnos and (n + 1) in all_epnos:
+                return True
+        return False
+    longs = [e for e in g["eps"] if e["dur"] >= FANJU_MIN and not _clamped(e)]
     for e in longs:
         g["eps"].remove(e)
         g["mains"].append(e)
