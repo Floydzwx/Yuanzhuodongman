@@ -485,7 +485,10 @@ for k, g in groups.items():
 FANJU_MIN = 1200   # 20 分钟：低于此值的单集视为分P 片段，不足以称番剧
 
 # 用户明确指定为独立番剧的短篇（虽不足 20 分钟，本身就是一部完整作品）
-SHORT_FANJU = {"校园80系列", "捡回家系列"}
+# 注：「校园80系列」原在此白名单中，但它是 P1+P2 的连载短篇、从未出汇总版，
+#     留在白名单里会绕过时长判定、把 11min 的 P1 误当主视频。
+#     已移出，改由 FORCE_NO_SUMMARY + serial 规则处理。
+SHORT_FANJU = {"捡回家系列"}
 for k, g in list(groups.items()):
     real = [v for v in g["mains"] if v["dur"] >= FANJU_MIN]
     pm = [v for v in g["mains"] if "泡面番" in v["title"]]
@@ -633,9 +636,14 @@ FORCE_NOT_PAOMIAN = (
 # 强欲魔女：mains 里混了 88min 的【强欲魔女12】等合并集，但不是完整汇总；
 #           真正的单集是 9~11min 的 01~09，按无汇总处理。
 # 对比：愤怒魔女有 226min 超长电影版、傲慢魔女有 180min，属有汇总版。
+# 校园80系列：只有 P1（11min，8/21 发）和 P2（17min，8/22 发）两条，
+#             分两天连载发布，UP 主从未做过汇总版。
+#             原先它被写进 SHORT_FANJU 白名单而绕过了时长判定，
+#             导致 11min 的 P1 被当成主视频（形似汇总版）。
 FORCE_NO_SUMMARY = (
     "怠惰魔女",
     "强欲魔女",
+    "校园80",
 )
 
 for g in fanju:
