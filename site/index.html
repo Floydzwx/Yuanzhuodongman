@@ -293,7 +293,7 @@ select,input{width:100%}
 <h2 id="fanju">番剧作品<span class="cnt2">（100 部）</span></h2>
 <p class="note">默认按发布时间从近到远排列。排序与筛选对下方所有栏目同时生效。</p>
 <div id="list"></div>
-<div id="empty" class="note hide" style="padding:30px;text-align:center">没有符合条件的作品</div>
+<div id="empty" class="note hide" style="padding:30px;text-align:center">没有符合要求的作品</div>
 
 <h2 id="paomian">泡面番专区<span class="cnt2">（145 个）</span></h2>
 <p class="note">共 145 部。</p>
@@ -881,6 +881,16 @@ function updateSecCount(sec, n){
   if(!c || !cntEl) return;
   cntEl.textContent = '共 ' + n + ' ' + c.label;
 }
+// 更新栏目标题里的括号计数（如「番剧作品（100 部）」）。
+// 有搜索词时改成「有 n 个符合要求」，清空搜索则还原为初始文案。
+function updateHeadCount(sec, n, q){
+  const h2 = document.getElementById(sec);
+  if(!h2) return;
+  const el = h2.querySelector('.cnt2');
+  if(!el) return;
+  if(!h2.dataset.origCnt) h2.dataset.origCnt = el.textContent;
+  el.textContent = q ? '（有 ' + n + ' 个符合要求）' : h2.dataset.origCnt;
+}
 // 统计某个栏目当前可见的条目数
 function countVisible(sec){
   const h2 = document.getElementById(sec);
@@ -945,6 +955,9 @@ function render(){
   });
   cntEl.textContent = '共 ' + arr.length + ' 部作品';
   updateSecCount('fanju', arr.length);
+  // 番剧区h2 里的「（100 部）」也要跟着筛选/搜索变。
+  // 之前 secs 数组里没有 'fanju'，导致这一栏计数永远显示初始值。
+  updateHeadCount('fanju', arr.length, q);
   listEl.innerHTML = arr.map(w=>
     '<div class="work'+(w.ns?' warnbox':'')+'"><div class="whead">'+w.h+'</div></div>').join('');
   emptyEl.classList.toggle('hide', arr.length>0);
@@ -1003,8 +1016,8 @@ function renderHits(q){
   });
   const names = {pm:'泡面番', series:'系列', special:'其它'};
   const other = Object.entries(groups);
-  let html = '<div class="hh">搜索「' + q + '」的结果：番剧 ' + main.length + ' 部';
-  if(other.length) html += '，其它栏目 ' + other.reduce((a,[,v])=>a+v.length,0) + ' 个（已在下方对应栏目内筛选显示）';
+  let html = '<div class="hh">搜索「' + q + '」的结果：番剧有 ' + main.length + ' 个符合要求';
+  if(other.length) html += '，其它栏目有 ' + other.reduce((a,[,v])=>a+v.length,0) + ' 个符合要求（已在下方对应栏目内筛选显示）';
   html += '</div>';
   if(main.length) {
     html += '<div class="hrow"><span class="hcat">番剧</span><span class="hitem">';
@@ -1061,18 +1074,10 @@ function applySearchHighlight(q){
     scope.forEach(x=>{
       if(x.tagName==='P' && x.classList.contains('note')) x.style.display = q ? 'none' : '';
     });
-    // 区块标题的计数
-    if(h2){
-      const cntEl = h2.querySelector('.cnt2');
-      if(!cntEl) return;
-      if(!h2.dataset.orig) h2.dataset.orig = cntEl.textContent;
-      if(q){
-        const n = topCards.filter(c=>c.style.display!=='none').length;
-        cntEl.textContent = '（命中 ' + n + ' 个）';
-      } else {
-        cntEl.textContent = h2.dataset.orig;
-      }
-    }
+    // 区块标题的计数：与番剧区共用同一套文案
+    // （变量名避开外层的 n —— 函数开头已用 let n 遍历兄弟节点）
+    const shown = topCards.filter(c=>c.style.display!=='none').length;
+    updateHeadCount(id, shown, q);
   });
   // 无匹配时给出提示
   ['paomian','other','birthday'].forEach(id=>{
