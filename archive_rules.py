@@ -8,7 +8,7 @@
 用户原话：
   A1 → 「上大学之后，才发现冰山学姐是你的游戏搭子【超长电影版】」的分P
   B组 → 「重生后，我成了小富婆的电竞经理【第二季】」的分P，注意顺序
-  C组 → 新番剧，单开一部作品
+  C组 → 新番剧（无汇总版），单开一部作品
   D中2个 → 泡面番
   E1 → 新番剧，单开一部作品
   E2 → 「修正历史后，我成了强欲魔女的白月光【01-05】」的分P
@@ -39,12 +39,15 @@ PAOMIAN_BV = [
 ]
 
 # 新开番剧作品。
-# C 组的主视频选 BV1TppR6xE5N（61:21，全系列唯一不带集号的长片，
-#   且是该 IP 最早发布的合集型视频）；BV1gCxY6VE72【06-10】虽更长，
-#   但带集号，属阶段性合并集，按分P 处理（与「强欲魔女12」同理）。
+# C 组是「无汇总版」：8 条都是独立片段，UP 主并没有把整部合并成一个总合集。
+#   代表作按站点既定口径取全组最早发布的一条 → BV1TppR6xE5N（2026-10-16），
+#   其余 7 条（含【06-10】这类阶段性合并集）一律作为分P 展示；
+#   统计栏不出现「主视频」，改显示总时长 / 视频数 / 代表作播放。
+# E1 只有一条，仍按有汇总版的单视频作品处理。
 NEW_FANJU = [
     {
         "key": "你是说，我的两位青梅都是boss？",
+        "no_summary": True,
         "main": "BV1TppR6xE5N",
         "eps": [
             "BV1HFnv6XEdE",  # 【01】
@@ -86,11 +89,22 @@ def recompute(g):
     g["eps_dur"] = sum(v["dur"] for v in g["eps"])
 
 
-def make_group(key, main, eps):
-    """构造一个全新的番剧作品分组，字段与 classify.py 产出保持一致。"""
+def make_group(key, main, eps, no_summary=False):
+    """构造一个全新的番剧作品分组，字段与 classify.py 产出保持一致。
+
+    no_summary=True 时按站点口径处理：整组没有汇总版，代表作取全组
+    最早发布的一条（不挑最长的），其余全部作为分P，统计栏不显示主视频。
+    """
     main = dict(main)
-    main.setdefault("rules", ["用户指定为新番剧作品"])
     eps = [dict(e) for e in eps]
+    if no_summary:
+        label = "用户指定为无汇总版番剧"
+        allv = [main] + eps
+        main = min(allv, key=lambda v: v.get("pubdate", 0))
+        eps = [v for v in allv if v["bvid"] != main["bvid"]]
+    else:
+        label = "用户指定为新番剧作品"
+    main.setdefault("rules", [label])
     for e in eps:
         e.setdefault("rules", [])
     g = {
@@ -99,10 +113,10 @@ def make_group(key, main, eps):
         "main": main,
         "mains": [main],
         "eps": eps,
-        "no_summary": False,
+        "no_summary": no_summary,
         "paomian": False,
         "fanju_flag": True,
-        "reasons": ["用户指定为新番剧作品"],
+        "reasons": [label],
         "main_in_eps": False,
         "total_dur": 0, "total_view": 0, "video_count": 0,
         "main_view": 0, "start_ts": 0, "latest_ts": 0,
@@ -138,10 +152,12 @@ def apply_user_archive(fanju, normal, orphan, special, held):
     for spec in NEW_FANJU:
         main = H[spec["main"]]
         eps = [H[b] for b in spec["eps"]]
-        g = make_group(spec["key"], main, eps)
+        g = make_group(spec["key"], main, eps, spec.get("no_summary", False))
         fanju.append(g)
-        print("  新开番剧 %-22s 主视频=%s | 分P %d 个 | %d 个视频" %
-              (spec["key"][:20], main["bvid"], len(eps), g["video_count"]))
+        print("  新开番剧 %-22s %s=%s | 分P %d 个 | %d 个视频%s" %
+              (spec["key"][:20], "代表作" if g["no_summary"] else "主视频",
+               g["main"]["bvid"], len(g["eps"]), g["video_count"],
+               "（无汇总版）" if g["no_summary"] else ""))
 
     # 3) 泡面番
     for bv in PAOMIAN_BV:
