@@ -29,14 +29,14 @@ DATA = json.loads(m.group(1))
 entries = []  # (栏目, bv)
 for w in DATA:
     # w['h'] 内含主视频卡 + 其他汇总版 + 分P，页面实际就是渲染这些链接
-    for bv in re.findall(r"/video/(BV[0-9A-Za-z]+)", w["h"]):
+    for bv in re.findall(r'data-bv="(BV[0-9A-Za-z]+)"', w["h"]):
         entries.append(("番剧", bv))
 
 # 泡面番区：静态 HTML，边界必须用 pmList 容器（h2 之后紧跟）
 pm_start = html.find('<div id="pmList">')
 pm_end = html.find('<h2 id="birthday">')
 pm_html = html[pm_start:pm_end]
-for bv in re.findall(r"/video/(BV[0-9A-Za-z]+)", pm_html):
+for bv in re.findall(r'data-bv="(BV[0-9A-Za-z]+)"', pm_html):
     entries.append(("泡面番", bv))
 
 # 分P集 / 特别篇
@@ -44,7 +44,7 @@ for sec, name, nxt in (("birthday", "特别", "other"), ("other", "其它", None
     s = html.find(f'<h2 id="{sec}">')
     e = html.find(f'<h2 id="{nxt}">') if nxt else html.find("</div>\n<script>")
     chunk = html[s: e if e > 0 else len(html)]
-    for bv in re.findall(r"/video/(BV[0-9A-Za-z]+)", chunk):
+    for bv in re.findall(r'data-bv="(BV[0-9A-Za-z]+)"', chunk):
         entries.append((name, bv))
 
 c = Counter(bv for _, bv in entries)
@@ -102,3 +102,23 @@ js = re.search(r"const DATA = .*?</script>", html, re.S).group(0)
 for line in js.split("\n"):
     if "key==='dur'" in line or "w.ns" in line:
         print("  ", line.strip())
+
+print()
+print("=" * 60)
+print("6. 充电视频跳转")
+print("=" * 60)
+QUARK = "https://pan.quark.cn/s/a7c32f25b332#/list/share/4e66a639f04948cda234fc7d14cbe8ff"
+# DATA 里的 HTML 是 JSON 字符串，引号被转义，先还原再统一匹配卡片
+flat = html.replace('\\"', '"')
+cards = re.findall(r'<a class="vcard ([^"]*)"[^>]*href="([^"]+)"', flat)
+charged = [u for c, u in cards if "charged" in c]
+plain = [u for c, u in cards if "charged" not in c]
+print(f"卡片 {len(cards)} 张 | 充电 {len(charged)} | 普通 {len(plain)}")
+bad_charged = [u for u in charged if u != QUARK]
+bad_plain = [u for u in plain if not u.startswith("https://www.bilibili.com/video/")]
+print("充电卡片未指向网盘:", len(bad_charged), bad_charged[:3])
+print("普通卡片未指向 B 站:", len(bad_plain), bad_plain[:3])
+if len(cards) == 757 and len(charged) == 38 and not bad_charged and not bad_plain:
+    print("✓ 38 个充电视频全部改跳网盘，其余仍跳 B 站")
+else:
+    print("✗ 跳转校验未通过")

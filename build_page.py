@@ -25,17 +25,28 @@ def ts2date(t):
     import datetime
     return datetime.datetime.fromtimestamp(t or 0).strftime("%Y-%m-%d")
 
+# 充电专属视频不在 B 站直接播放，点击统一去夸克网盘资源页。
+# 判定口径与卡片左上角「充电视频」红标完全一致：v["charged"] 为真。
+QUARK_URL = "https://pan.quark.cn/s/a7c32f25b332#/list/share/4e66a639f04948cda234fc7d14cbe8ff"
+
+def vlink(v):
+    """视频卡片的目标地址：充电视频 → 网盘；其余 → B 站原视频。"""
+    if v.get("charged"):
+        return QUARK_URL
+    return f"https://www.bilibili.com/video/{v['bvid']}"
+
 def vcard(v, cls=""):
     img = f"covers/{v['cover']}" if v.get("has_cover") else ""
     cover = f'<img src="{html.escape(img)}" alt="">' if img else '<div class="nocov">无封面</div>'
     # data-* 供前端排序使用：这三个栏目每张卡片就是一个视频
     # dur=视频本身时长（主视频时长与总时长对单视频而言是同一个值）
-    ds = (f' data-dur="{v["dur"]}" data-tdur="{v["dur"]}" '
+    # data-bv 保留 BV 号，供校验脚本统计（充电视频的 href 已不是 B 站链接）
+    ds = (f' data-bv="{v["bvid"]}" data-dur="{v["dur"]}" data-tdur="{v["dur"]}" '
           f'data-view="{v.get("view",0)}" data-pub="{v.get("pubdate",0)}"')
-    # 充电视频：左上角红标+ 卡片加 charged 类
+    # 充电视频：左上角红标+ 卡片加 charged 类，并改跳网盘
     charged = '<div class="payflag">充电视频</div>' if v.get("charged") else ""
     ccls = cls + (" charged" if v.get("charged") else "")
-    return f'''<a class="vcard {ccls}"{ds} href="https://www.bilibili.com/video/{v['bvid']}" target="_blank">
+    return f'''<a class="vcard {ccls}"{ds} href="{html.escape(vlink(v), quote=True)}" target="_blank">
 {cover}{charged}<div class="dur">{dur(v['dur'])}</div>
 <div class="vm"><div class="vt">{html.escape(v['title'])}</div>
 <div class="vs">{v['date']} · {num(v.get('view',0))}播放 · {v['bvid']}</div></div></a>'''
@@ -84,7 +95,7 @@ for w in main_works:
 </div>'''
     works_data.append({
         "t": m["title"], "base": w["base"], "ns": ns, "pm": bool(w.get("paomian")),
-        "bv": m["bvid"],
+        "bv": m["bvid"], "lk": vlink(m),
         "all": " ".join([m["title"]] + [x["title"] for x in (w["mains"] + w["eps"])]).lower(),
         "dur": m["dur"], "tdur": w["total_dur"], "cnt": w["video_count"],
         "mv": w["main_view"], "tv": w["total_view"],
@@ -730,7 +741,7 @@ function renderHits(q){{
   html += '</div>';
   if(main.length) {{
     html += '<div class="hrow"><span class="hcat">番剧</span><span class="hitem">';
-    html += main.slice(0,20).map(w=>'<a href="https://www.bilibili.com/video/'+w.bv+'" target="_blank">'+w.t.slice(0,26)+'</a>').join('');
+    html += main.slice(0,20).map(w=>'<a href="'+(w.lk||'https://www.bilibili.com/video/'+w.bv)+'" target="_blank">'+w.t.slice(0,26)+'</a>').join('');
     if(main.length>20) html += '<span class="hmore">…另有 '+(main.length-20)+' 部</span>';
     html += '</span></div>';
   }}
