@@ -64,6 +64,10 @@ open(f"{SITE}/_headers", "w", encoding="utf-8").write(
     "/*.html\n"
     "  Cache-Control: public, max-age=3600\n"
     "\n"
+    "# 个人数据每天由 GitHub Actions 更新，禁止 CDN 缓存旧值\n"
+    "/profile.json\n"
+    "  Cache-Control: no-store\n"
+    "\n"
     "/favicon.ico\n"
     "  Cache-Control: public, max-age=604800\n"
 )

@@ -27,6 +27,21 @@ m_*.png
 site_check.png
 nohup.out
 
+# 增量更新用的本地工具与中间数据
+# 注意：bili_session.py 会读取本机浏览器 cookie 库，属隐私相关，绝不入库。
+# fetch_profile.py / archive_rules.py 不含敏感信息且被构建链与 Actions 依赖，需入库。
+bili_session.py
+fetch_new.py
+fetch_seasons_new.py
+probe_new.py
+merge_new.py
+videos_latest.json
+seasons_latest.json
+new_videos.json
+up_profile.json
+_tmp_key.bin
+_probe_page1.json
+
 # 旧页面（site/index.html 才是要部署的）
 covers_index.html
 fanju_index.html

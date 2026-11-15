@@ -1,0 +1,41 @@
+name: 每日刷新 UP 主个人数据
+
+# 北京时间每天 19:17 自动运行（GitHub cron 用 UTC）。
+# 只监听定时与手动触发，不监听 push —— 避免自己提交自己、形成死循环。
+on:
+  schedule:
+    - cron: '17 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 从 B 站接口抓取个人数据
+        # 匿名接口即可拿到粉丝数/名称/头像/签名；
+        # 需要登录的「主页累计播放、获赞」会沿用仓库里已有的值。
+        run: python fetch_profile.py --out site/profile.json
+
+      - name: 数据有变化才提交
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- site/profile.json; then
+            echo "数据无变化，跳过提交"
+          else
+            git add site/profile.json
+            git commit -m "chore: 每日自动刷新 UP 主个人数据"
+            git push
+            echo "已推送，Cloudflare Pages 将自动重新部署"
+          fi

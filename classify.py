@@ -147,6 +147,16 @@ for v in d:
     v["eps"] = eps
     v["ep_ord"] = ep_ord
 
+# ==== 用户指定归档：新增视频先摘出，不参与自动分组 ====
+# 详见 archive_rules.py。原有 740 条的分类结果与历史完全一致（零回归），
+# 新增 17 条等全部分类结束后由 apply_user_archive() 按用户指定强制插入，
+# 避免自动规则把「【06-10】」「【结局·上篇】」这类新标题误判成主视频。
+from archive_rules import HELD_BVIDS, apply_user_archive
+HELD = [v for v in d if v["bvid"] in HELD_BVIDS]
+d = [v for v in d if v["bvid"] not in HELD_BVIDS]
+for v in HELD:
+    v["rules"] = []
+
 # ============ 2. 作品分组：同 IP 合并 ============
 # 同一作品在不同期数/分P批次下标题措辞不同，手工归纳为同一 IP
 IP_ALIAS = [
@@ -887,7 +897,7 @@ for _x in series: _allids |= {v["bvid"] for v in _x["items"]}
 # no_summary 组的 main 同时出现在 mains 里、并已复制进 eps，故按集合去重（上面已是并集）
 tot = len(_allids)
 print("=" * 60)
-print(f"总视频 {len(d)}")
+print(f"总视频 {len(d) + len(HELD)}（其中 {len(HELD)} 条按用户指定归档，不参与自动分组）")
 print(f"番剧作品 {len(fanju)} 部  |其中泡面番 {sum(1 for g in fanju if g['paomian'])} 部")
 print(f"  汇总视频 {sum(len(g['mains']) for g in fanju)} 个")
 print(f"  归组分P {sum(len(g['eps']) for g in fanju)} 个")
@@ -935,6 +945,11 @@ def _ip_key(v):
     return t[:40]
 
 series.sort(key=lambda x: -x["video_count"])
+
+# ==== 用户指定归档：把摘出的新增视频按指定归属插入 ====
+# 放在所有聚合/去重/排序之后，保证 final 数据里的统计字段全部重算到位。
+print("\n=== 用户指定归档（新增视频）===")
+apply_user_archive(fanju, normal, orphan, special, HELD)
 
 json.dump({"fanju": fanju, "normal": normal, "orphan": orphan, "special": special, "series": series},
           open(f"{BASE}/classified.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)

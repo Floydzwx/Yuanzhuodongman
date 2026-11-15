@@ -13,8 +13,13 @@ def dur(s):
 
 
 def num(n):
+    """与页面 JS 的 fmtNum 保持同一口径：亿 / 万 / 原值。"""
     n = int(n or 0)
-    return f"{n/10000:.1f}万" if n >= 10000 else str(n)
+    if n >= 100000000:
+        return f"{n/100000000:.2f}亿"
+    if n >= 10000:
+        return f"{n/10000:.1f}万"
+    return str(n)
 
 def ts2date(t):
     import datetime
@@ -159,10 +164,28 @@ over30 = sum(1 for g in main_works if 1800 < g["main"]["dur"] <= 3600)
 kw_only = sum(1 for g in main_works if g["main"]["dur"] <= 3600 and not g["eps"])
 
 # ==== UP 主信息 ====
-# 页头展示被收录的 UP 主（圆桌动漫），页尾展示制作者本人
-UP_NAME = "圆桌动漫"
+# 个人数据在每次构建时自动从 B 站接口刷新（fetch_profile.py，免登录也能拿粉丝数）；
+# 静态值只是联网失败时的兜底。site/profile.json 还会被 GitHub Actions 每天更新，
+# 页面加载时会读它覆盖这里的静态值，实现「打开就是最新数据」。
+def _load_profile():
+    import subprocess, sys
+    path = f"{BASE}/site/profile.json"
+    try:
+        subprocess.run([sys.executable, f"{BASE}/fetch_profile.py", "--out", path],
+                       timeout=60, capture_output=True)
+    except Exception:
+        pass
+    try:
+        return json.load(open(path, encoding="utf-8"))
+    except Exception:
+        return {}
+
+P = _load_profile()
+UP_NAME = P.get("name") or "圆桌动漫"
 UP_URL = "https://space.bilibili.com/654552"
-UP_FANS = 6016354
+UP_FANS = P.get("follower") or 6016354
+UP_TOTAL_VIEW = P.get("upTotalView") or 0     # UP 主页累计播放（口径≠收录视频之和）
+UP_LIKES = P.get("likes") or 0
 # 制作者（页尾名片）
 ME_NAME = "如何获取确币"
 ME_URL = "https://space.bilibili.com/3546856434960768?spm_id_from=333.1387.0.0"
@@ -195,7 +218,12 @@ TOTAL_VIEW = sum(v.get("view", 0) for v in all_videos)
 SNAP_DATE = datetime.datetime.fromtimestamp(
     max(v.get("pubdate", 0) for v in all_videos)
 ).strftime("%Y-%m-%d")
-# 各时长区间的视频数（按全部 740 个视频统计）
+# 个人数据的更新日期（来自 profile.json；没有则退回视频截取日期）
+PROFILE_DATE = (P.get("updatedAt") or "")[:10] or SNAP_DATE
+PROFILE_EXTRA = (f" · 主页累计 {num(UP_TOTAL_VIEW)} 播放 · {num(UP_LIKES)} 获赞"
+                 if UP_TOTAL_VIEW else "")
+PROFILE_STATUS = f"数据更新于 {PROFILE_DATE}{PROFILE_EXTRA}"
+# 各时长区间的视频数（按全部视频统计）
 OVER60_VIDEOS = sum(1 for v in all_videos if _dur_sec(v.get("duration")) > 3600)
 OVER30_VIDEOS = sum(1 for v in all_videos if 1800 < _dur_sec(v.get("duration")) <= 3600)
 UNDER30_VIDEOS = sum(1 for v in all_videos if _dur_sec(v.get("duration")) <= 1800)
@@ -464,7 +492,7 @@ select,input{{width:100%}}
       <span><b data-live="totalview">{num(TOTAL_VIEW)}</b> 总播放</span>
       <span><b>{len(all_videos)}</b> 收录视频</span>
     </div>
-    <div class="upstateline" data-live="status">静态数据</div>
+    <div class="upstateline" data-live="status">{PROFILE_STATUS}</div>
   </div>
 </div>
 <div class="stats">
@@ -545,8 +573,9 @@ const listEl = document.getElementById('list'), emptyEl = document.getElementByI
       cntEl = document.getElementById('cnt');
 function fmtDur(s){{return s>=3600? Math.floor(s/3600)+':'+String(Math.floor(s%3600/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0') : Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}}
 function fmtDate(t){{const d=new Date(t*1000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}}
-function fmtNum(n){{return n>=10000? (n/10000).toFixed(1)+'万' : String(n);}}
 function d2(n){{return String(n).padStart(2,'0');}}
+// fmtNum 统一定义在本段脚本末尾的「个人数据自动更新」区（支持 亿/万 两级），
+// 这里不再重复声明，避免后定义覆盖前定义造成口径混乱。
 
 // 顶部「共 N 部作品」跟随当前栏目变化：
 // 番剧=作品数，泡面番/特别/其它=视频数（这些栏目一个卡片就是一个视频）
@@ -836,9 +865,12 @@ setTimeout(syncNav, 800);
 syncNav();
 syncSecCount();
 
-// ===== 实时数据：部署到 Cloudflare 后从 Worker 拉取粉丝量与播放量汇总 =====
-// 把 WORKER_API 改成你的 Worker 地址（如 https://xxx.workers.dev）即可自动生效；
-// 留空则页面使用构建时的静态数据，功能不受影响。
+// ===== 个人数据自动更新 =====
+// 模式一（可选）：部署了 Worker 就走 /api/stats，能实时刷新粉丝量、总播放、
+//   以及每部作品的播放量。把 WORKER_API 填成 https://xxx.workers.dev 即生效。
+// 模式二（默认，零配置）：读取同目录的 profile.json。该文件由 GitHub Actions
+//   每天定时从 B 站接口刷新并推送，Cloudflare Pages 会自动重新部署。
+//   打开页面时覆盖页头的粉丝数，静态构建值仅作兜底。
 const WORKER_API = "{WORKER_API}";
 function fmtNum(n){{
   if(typeof n !== 'number' || !isFinite(n)) return n;
@@ -846,19 +878,29 @@ function fmtNum(n){{
   if(n >= 10000) return (n/10000).toFixed(1).replace(/\\.0$/,'') + '万';
   return n.toLocaleString('zh-CN');
 }}
-async function loadLive(){{
-  if(!WORKER_API) return;
+function setStatus(txt){{
+  const st = document.querySelector('[data-live="status"]');
+  if(st) st.textContent = txt;
+}}
+// 把 profile.json 里的个人数据写进页头
+function applyProfile(p, prefix){{
+  const fanEl = document.querySelector('[data-live="follower"]');
+  if(fanEl && typeof p.follower === 'number') fanEl.textContent = fmtNum(p.follower);
+  const date = (p.updatedAt || '').slice(0, 10);
+  const extra = (typeof p.upTotalView === 'number' && typeof p.likes === 'number')
+    ? ' · 主页累计 ' + fmtNum(p.upTotalView) + ' 播放 · ' + fmtNum(p.likes) + ' 获赞' : '';
+  setStatus(prefix + ' · ' + date + extra);
+}}
+// 模式一：Worker 实时（粉丝 + 总播放 + 每部作品播放量）
+async function loadWorker(){{
   try{{
     const r = await fetch(WORKER_API + '/api/stats', {{cache:'no-store'}});
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-    // 粉丝量
     const fanEl = document.querySelector('[data-live="follower"]');
     if(fanEl && typeof d.follower === 'number') fanEl.textContent = fmtNum(d.follower);
-    // 总播放量
     const tvEl = document.querySelector('[data-live="totalview"]');
     if(tvEl && typeof d.totalView === 'number') tvEl.textContent = fmtNum(d.totalView);
-    // 更新每部作品的播放量（按作品 key 匹配）
     const map = {{}};
     (d.works || []).forEach(w => map[w.key] = w);
     document.querySelectorAll('[data-work]').forEach(el => {{
@@ -867,22 +909,22 @@ async function loadLive(){{
       const b = el.querySelector('b');
       if(b) b.textContent = fmtNum(it.view);
     }});
-    // 更新时间
-    const tsEl = document.querySelector('[data-live="updated"]');
-    if(tsEl && d.updatedAt){{
-      const t = new Date(d.updatedAt);
-      tsEl.textContent = t.getFullYear() + '-' +
-        String(t.getMonth()+1).padStart(2,'0') + '-' +
-        String(t.getDate()).padStart(2,'0');
-    }}
-    const st = document.querySelector('[data-live="status"]');
-    if(st) st.textContent = '实时数据 · ' + fmtNum(d.totalVideos) + ' 个视频';
+    setStatus('实时数据 · ' + fmtNum(d.totalVideos) + ' 个视频');
   }}catch(e){{
-    const st = document.querySelector('[data-live="status"]');
-    if(st) st.textContent = '静态数据（未配置或接口不可用）';
+    loadProfileJson();
   }}
 }}
-if(WORKER_API) loadLive();
+// 模式二：每日自动刷新的静态 profile.json（无需任何后端）
+async function loadProfileJson(){{
+  try{{
+    const r = await fetch('./profile.json', {{cache:'no-store'}});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    applyProfile(await r.json(), '自动更新');
+  }}catch(e){{
+    // 联网失败就用构建时的静态值，页面照常可用
+  }}
+}}
+if(WORKER_API) loadWorker(); else loadProfileJson();
 </script>
 </body></html>'''
 

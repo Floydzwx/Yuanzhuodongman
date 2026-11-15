@@ -15,6 +15,8 @@ def dl(v):
     if pic.startswith("//"): pic="https:"+pic
     pic=pic.split("?")[0]
     if not pic.startswith("http"): pic="https://"+pic
+    # B 站 CDN 返回的 pic 常是 http://，部分网络环境会拦截 80 端口；统一走 HTTPS
+    if pic.startswith("http://"): pic="https://"+pic[7:]
     ext=".jpg"
     if ".png" in pic.lower(): ext=".png"
     elif ".jpeg" in pic.lower() or ".jpg" in pic.lower(): ext=".jpg"

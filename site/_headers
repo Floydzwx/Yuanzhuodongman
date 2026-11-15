@@ -4,5 +4,9 @@
 /*.html
   Cache-Control: public, max-age=3600
 
+# 个人数据每天由 GitHub Actions 更新，禁止 CDN 缓存旧值
+/profile.json
+  Cache-Control: no-store
+
 /favicon.ico
   Cache-Control: public, max-age=604800
